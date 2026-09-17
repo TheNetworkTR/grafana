@@ -126,8 +126,15 @@ jobs:
                       echo "::error::the frontend bundle does not contain RadarOS — the patch did not reach the build"
                       exit 1
                   fi
-                  if grep -rqF 'Welcome to Grafana' "${js}"/*.js; then
-                      echo "::error::the upstream login title is still in the bundle"
+                  # The compiled constant, not a loose phrase. "Welcome to
+                  # Grafana" also lives in an i18n string belonging to the
+                  # welcome panel — a plugin this console never renders, since
+                  # its home dashboard is the fleet overview — so grepping for
+                  # it failed a build whose patch was actually correct. Measured
+                  # on the first run that got this far. What must not survive is
+                  # upstream's own AppTitle.
+                  if grep -rqF 'AppTitle="Grafana"' "${js}"/*.js; then
+                      echo "::error::upstream's AppTitle is still compiled into the bundle"
                       exit 1
                   fi
                   if ! grep -qF 'RadarOS' "${work}/usr/share/grafana/public/views/index.html"; then
