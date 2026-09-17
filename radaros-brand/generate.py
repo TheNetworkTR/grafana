@@ -8,12 +8,12 @@ filename rather than by adding new files keeps the patch to Branding.tsx down to
 text constants: the imports there already point at these three names, so a
 rebase onto a new upstream tag never has to re-point them.
 
-TWO SCALES, WHICH IS THE WHOLE POINT OF THIS FILE. The Network. kit ships a
-compact monogram for small surfaces and a full three-line mark for large ones,
-and `agencyos/docs/LOGO_USAGE.md` is explicit about which goes where. The menu
-logo and the favicon live in a 32px box, where the full mark renders as mud —
-measured by rendering both at 32px and comparing. Everything at that size gets
-the monogram; only the login backdrop, which is 1920x1080, gets the full mark.
+ONE MARK, EVERY SURFACE. The square The Network. mark goes into every file
+Grafana serves — menu logo, login logo, preloader, tab icon, pinned tab and the
+login backdrop alike. The kit also ships a compact monogram for small surfaces,
+and it is deliberately NOT used here: the fleet's consoles are meant to be
+recognisable as one brand before they are optimised per slot. The cost is
+legibility in the ~32px surfaces, which is accepted.
 """
 import re
 import subprocess
@@ -79,13 +79,13 @@ def backdrop(paths, box, ground, watermark):
 
 
 def app_icon(bg_path, paths, box):
-    """Tab and touch icon: the kit's own rounded ground, white monogram on it.
+    """Tab and touch icon: the kit's own rounded ground, the white mark on it.
 
     Its own dark ground is what keeps the icon legible against a light AND a
     dark browser chrome — a transparent mark would disappear into one of them.
     """
     side = 512
-    scale = (side * 0.68) / box[2]
+    scale = (side * 0.70) / box[2]
     tx = (side - box[2] * scale) / 2 - box[0] * scale
     ty = (side - box[3] * scale) / 2 - box[1] * scale
     body = "".join(p.replace("<path ", f'<path fill="{PAPER}" ') for p in paths)
@@ -95,15 +95,12 @@ def app_icon(bg_path, paths, box):
 
 
 def main(kit_dir: Path, mark_src: Path):
-    monogram_src = kit_dir / "thenetworktr_logo_s.svg"
     favicon_src = kit_dir / "thenetworktr_favicon.svg"
-    for src in (monogram_src, favicon_src, mark_src):
+    for src in (favicon_src, mark_src):
         if not src.is_file():
             sys.exit(f"missing source: {src}")
     OUT.mkdir(parents=True, exist_ok=True)
 
-    mono_paths, mono_raw = read(monogram_src)
-    mono = measure(monogram_src, mono_raw)
     full_paths, full_raw = read(mark_src)
     full = measure(mark_src, full_raw)
 
@@ -113,11 +110,10 @@ def main(kit_dir: Path, mark_src: Path):
 
     files = {
         # Imported by Branding.tsx as the menu logo, the login logo and the
-        # preloader mark — every one of them a small box.
-        "grafana_icon.svg": mark(mono_paths, mono, INK, PAPER),
-        "grafana_mask_icon.svg": mark(mono_paths, mono, INK),
-        "grafana_mask_icon_white.svg": mark(mono_paths, mono, PAPER),
-        # 1920x1080, the one surface with room for the full mark.
+        # preloader mark.
+        "grafana_icon.svg": mark(full_paths, full, INK, PAPER),
+        "grafana_mask_icon.svg": mark(full_paths, full, INK),
+        "grafana_mask_icon_white.svg": mark(full_paths, full, PAPER),
         "g8_login_dark.svg": backdrop(full_paths, full, DARK_BG, PAPER),
         "g8_login_light.svg": backdrop(full_paths, full, PAPER, INK),
     }
@@ -125,7 +121,7 @@ def main(kit_dir: Path, mark_src: Path):
         (OUT / name).write_text(text)
 
     icon_svg = OUT / ".app-icon.svg"
-    icon_svg.write_text(app_icon(ground, mono_paths, mono))
+    icon_svg.write_text(app_icon(ground, full_paths, full))
     for name, px in (("fav32.png", 32), ("apple-touch-icon.png", 180)):
         subprocess.run(["rsvg-convert", "-w", str(px), "-h", str(px),
                         "-o", str(OUT / name), str(icon_svg)], check=True)
@@ -134,8 +130,7 @@ def main(kit_dir: Path, mark_src: Path):
     touch = OUT / "apple-touch-icon.png"
     Image.open(touch).convert("RGB").save(touch)
 
-    print(f"monogram {mono_raw} -> {[round(v, 1) for v in mono]}")
-    print(f"full mark {full_raw} -> {[round(v, 1) for v in full]}")
+    print(f"square mark {full_raw} -> {[round(v, 1) for v in full]}")
     print(f"{len(files) + 2} files written to {OUT}")
 
 

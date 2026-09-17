@@ -24,21 +24,23 @@ That is deliberate: `Branding.tsx` already imports `grafana_icon.svg`,
 patch to that file never has to re-point an import, and a rebase onto a newer
 upstream tag stays a text-only conflict at worst.
 
-## Two scales, which is the whole point
+## One mark, every surface
 
-The kit ships a compact monogram for small surfaces and a full three-line mark
-for large ones. That distinction is not decoration:
+| File | Where it appears |
+| --- | --- |
+| `grafana_icon.svg` | menu logo, login logo, preloader |
+| `fav32.png`, `apple-touch-icon.png` | browser tab, iOS home screen |
+| `grafana_mask_icon*.svg` | Safari pinned tab |
+| `g8_login_*.svg` | login backdrop, as a watermark |
 
-| Surface | Size | Gets |
-| --- | --- | --- |
-| Menu logo, login logo, preloader (`grafana_icon.svg`) | ~32px box | monogram |
-| Tab and touch icon (`fav32.png`, `apple-touch-icon.png`) | 32px / 180px | monogram on the kit's dark ground |
-| Safari pinned tab (`grafana_mask_icon*.svg`) | 16px | monogram |
-| Login backdrop (`g8_login_*.svg`) | 1920×1080 | full mark, held back as a watermark |
+All of them carry the **square** The Network. mark. The kit also ships a compact
+monogram intended for small surfaces, and it is deliberately not used: the
+fleet's consoles are meant to read as one brand before they are optimised slot
+by slot.
 
-Measured before deciding: the full mark rendered into a 32px box is unreadable —
-three lines of type collapse into noise. The monogram is legible at the same
-size and, being roughly 2:1, also sits correctly in the wide slots.
+The cost is stated rather than hidden — in the ~32px surfaces (tab icon, menu
+logo) a three-line mark is at the edge of legibility. That is a known trade, not
+an oversight.
 
 ## Themes
 
@@ -52,3 +54,6 @@ on a dark sidebar.
 The login backdrops are separate files because Grafana picks between them itself
 (`theme.isDark` in `Branding.tsx`), which is the one place upstream already does
 the theme switch for us.
+
+The tab and touch icons sit on the kit's own dark rounded ground, which is what
+keeps them legible against a light AND a dark browser chrome.
