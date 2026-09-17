@@ -1,0 +1,181 @@
+name: RadarOS Release
+
+# The fork's publishing pipeline — produces the .deb RadarOS installs.
+#
+# WHY OUR OWN PIPELINE. Grafana keeps logo, favicon and application title
+# behind an Enterprise licence, so an OSS console can only carry another
+# brand by patching the source. Once the source is patched, the binary has to
+# come from somewhere, and "somewhere" is this file rather than a laptop.
+#
+# WHY THE SOURCE ARCHIVE IS BUILT IN THE SAME RUN. Grafana is AGPL-3.0-only.
+# Operating a modified version over a network obliges us to offer its source
+# to the people using it (§13). The repository is public, which already
+# satisfies that; the archive published next to the package is the stronger
+# form of the same promise — "the source corresponding to THIS binary" is only
+# true if both come out of one commit, in one run.
+#
+# WHY NOT THE FULL UPSTREAM TEST SUITE. Grafana's own suite runs for hours
+# across a sharded matrix; reproducing it here would make every brand change a
+# half-day. The net below is what our patches can actually break: types across
+# the whole frontend, the two components we edit, and a package that must
+# contain our artwork. Said plainly rather than implied — this is a narrower
+# net than upstream's, and the reason is cost.
+
+on:
+    push:
+        tags: ['*-radaros.*']
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+concurrency:
+    group: radaros-release-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        timeout-minutes: 90
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+              with:
+                  # The build stamps a commit into the binary; a shallow clone
+                  # would leave it reading "unknown".
+                  fetch-depth: 0
+
+            # Both toolchains come from the files upstream pins them in, never
+            # from a version written out here: a hand-written version silently
+            # stops matching the tag we rebase onto.
+            - name: Setup Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version-file: go.mod
+
+            - name: Setup Node
+              uses: actions/setup-node@v5
+              with:
+                  node-version-file: .nvmrc
+
+            - name: Enable Yarn
+              run: |
+                  corepack enable
+                  corepack install
+
+            - name: Install frontend dependencies
+              run: yarn install --immutable
+
+            # Types first: our patches touch a React component and a backend
+            # constant, and a type error there is cheaper to find here than
+            # after a twenty-minute bundle.
+            #
+            # This is the only pre-build gate. Upstream ships no tests for
+            # Branding.tsx or Footer.tsx (checked at v13.2.1 — both directories
+            # contain sources only), so a test step aimed at them would assert
+            # nothing. What our patches can actually break is checked after the
+            # build instead, out of the artefact itself.
+            - name: Typecheck
+              run: yarn typecheck
+
+
+            - name: Build package
+              env:
+                  # Upstream reads the version out of package.json; ours carries
+                  # the upstream version it is based on plus our patch level, so
+                  # `grafana-server -v` on the host answers both questions at
+                  # once.
+                  BUILD_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '0.0.0-dev' }}
+                  CGO_ENABLED: 0
+              run: |
+                  set -Eeuo pipefail
+                  gem install --no-document fpm
+                  make build-deb BUILD_VERSION="${BUILD_VERSION#v}" BUILD_NUMBER=radaros
+
+            # A package that builds is not a package that carries our brand.
+            # This reads the artwork back OUT of the .deb and fails if what
+            # ships is upstream's: the one defect this whole pipeline exists to
+            # prevent, and the one a green build would otherwise hide.
+            - name: Verify the package actually carries the brand
+              run: |
+                  set -Eeuo pipefail
+                  DEB="$(ls dist/*.deb)"
+                  echo "inspecting ${DEB}"
+                  work="$(mktemp -d)"
+                  dpkg-deb -x "${DEB}" "${work}"
+                  icon="${work}/usr/share/grafana/public/build/img/grafana_icon.svg"
+                  [ -f "${icon}" ] || { echo "::error::grafana_icon.svg missing from the package"; exit 1; }
+                  if ! grep -q 'prefers-color-scheme' "${icon}"; then
+                      echo "::error::the packaged icon is not ours — the brand did not reach the bundle"
+                      exit 1
+                  fi
+                  bundled="${work}/usr/share/grafana/data/plugins-bundled"
+                  count="$(ls "${bundled}" 2>/dev/null | wc -l | tr -d ' ')"
+                  echo "bundled plugins: ${count}"
+                  [ -d "${bundled}/prometheus" ] || { echo "::error::prometheus is not bundled — the fleet dashboard would be dead"; exit 1; }
+                  [ "${count}" -le 2 ] || { echo "::error::expected the trimmed plugin set, found ${count}"; exit 1; }
+                  # The strings are the half a build can silently drop: a webpack
+                  # cache, a stale chunk or a patch applied to the wrong copy
+                  # all produce a package that installs cleanly and still says
+                  # Grafana in the browser tab. Read them back out of the
+                  # shipped bundle, not out of the source tree.
+                  js="${work}/usr/share/grafana/public/build"
+                  if ! grep -rqF 'RadarOS' "${js}"/*.js; then
+                      echo "::error::the frontend bundle does not contain RadarOS — the patch did not reach the build"
+                      exit 1
+                  fi
+                  if grep -rqF 'Welcome to Grafana' "${js}"/*.js; then
+                      echo "::error::the upstream login title is still in the bundle"
+                      exit 1
+                  fi
+                  if ! grep -qF 'RadarOS' "${work}/usr/share/grafana/public/views/index.html"; then
+                      echo "::error::index.html still carries the upstream title"
+                      exit 1
+                  fi
+                  echo "ok: branded icon and strings present, prometheus bundled, plugin set trimmed"
+
+            - name: Package the corresponding source
+              id: pack
+              run: |
+                  set -Eeuo pipefail
+                  VERSION="${GITHUB_REF_NAME#v}"
+                  [ "${GITHUB_REF_TYPE}" = "tag" ] || VERSION="0.0.0-dev"
+                  DEB="$(ls dist/*.deb)"
+                  SOURCE="grafana-source-${VERSION}.tar.gz"
+                  # Same commit, same run — see the header.
+                  git archive --format=tar.gz --prefix="grafana-source-${VERSION}/" -o "${SOURCE}" HEAD
+                  sha256sum "${DEB}" | sed 's|dist/||' > "${DEB}.sha256"
+                  sha256sum "${SOURCE}" > "${SOURCE}.sha256"
+                  {
+                      echo "deb=${DEB}"
+                      echo "source=${SOURCE}"
+                      echo "version=${VERSION}"
+                  } >> "${GITHUB_OUTPUT}"
+                  echo "--- artefacts ---"
+                  cat "${DEB}.sha256" "${SOURCE}.sha256"
+
+            - name: Publish release
+              if: github.ref_type == 'tag'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  TAG_NAME: ${{ github.ref_name }}
+                  DEB: ${{ steps.pack.outputs.deb }}
+                  SOURCE: ${{ steps.pack.outputs.source }}
+              run: |
+                  set -Eeuo pipefail
+                  gh release create "${TAG_NAME}" --title "${TAG_NAME}" --notes \
+                    "Grafana, built with RadarOS brand patches. Patches: \`git log ${TAG_NAME%%-radaros.*}..${TAG_NAME}\`. The source archive is produced in this same run, as AGPL-3.0-only §13 requires." \
+                    || true
+                  gh release upload "${TAG_NAME}" \
+                    "${DEB}" "${DEB}.sha256" "${SOURCE}" "${SOURCE}.sha256" --clobber
+
+            - name: Upload artifact (manual runs)
+              if: github.ref_type != 'tag'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: radaros-grafana
+                  path: |
+                      dist/*.deb
+                      dist/*.deb.sha256
+                      grafana-source-*.tar.gz*
+                  retention-days: 7

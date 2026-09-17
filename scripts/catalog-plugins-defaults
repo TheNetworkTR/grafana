@@ -1,15 +1,7 @@
 # Catalog plugin IDs to bundle under data/plugins-bundled (one per line).
 # Optional pin: id:version.
-elasticsearch
+#
+# This fleet has exactly one datasource. Upstream bundles thirteen; each of
+# the others is code downloaded at build time, shipped in the package and
+# loaded into a console that can never reach it.
 prometheus
-tempo
-zipkin
-opentsdb
-stackdriver
-mssql
-jaeger
-loki
-mysql
-influxdb
-grafana-postgresql-datasource
-grafana-pyroscope-datasource
