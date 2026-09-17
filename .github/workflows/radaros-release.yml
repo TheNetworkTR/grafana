@@ -89,7 +89,9 @@ jobs:
                   CGO_ENABLED: 0
               run: |
                   set -Eeuo pipefail
-                  gem install --no-document fpm
+                  # The runner's gem home belongs to root; fpm is a build tool
+                  # here, not a dependency of the package.
+                  sudo gem install --no-document fpm
                   make build-deb BUILD_VERSION="${BUILD_VERSION#v}" BUILD_NUMBER=radaros
 
             # A package that builds is not a package that carries our brand.
