@@ -105,12 +105,30 @@ jobs:
                   echo "inspecting ${DEB}"
                   work="$(mktemp -d)"
                   dpkg-deb -x "${DEB}" "${work}"
-                  icon="${work}/usr/share/grafana/public/build/img/grafana_icon.svg"
-                  [ -f "${icon}" ] || { echo "::error::grafana_icon.svg missing from the package"; exit 1; }
-                  if ! grep -q 'prefers-color-scheme' "${icon}"; then
-                      echo "::error::the packaged icon is not ours — the brand did not reach the bundle"
-                      exit 1
-                  fi
+                  # EVERY mark the package ships, not just the menu icon. The
+                  # first version of this gate checked one file and passed a
+                  # package whose wordmark slots — reachable from the solo panel
+                  # page — still carried upstream's logo. Ours are rendered from
+                  # one square source, so they all share its viewBox; upstream's
+                  # are 16x16, 394x92.9, 51x12 and so on.
+                  img="${work}/usr/share/grafana/public/build/img"
+                  for f in grafana_icon grafana_mask_icon grafana_mask_icon_white \
+                           grafana_text_logo_dark grafana_text_logo_light \
+                           grafana_text_logo-dark grafana_text_logo-light \
+                           grafana_typelogo; do
+                      [ -f "${img}/${f}.svg" ] || { echo "::error::${f}.svg missing from the package"; exit 1; }
+                      if ! grep -q 'viewBox="0 15 350 320"' "${img}/${f}.svg"; then
+                          echo "::error::${f}.svg is not the RadarOS mark — upstream artwork reached the package"
+                          exit 1
+                      fi
+                  done
+                  # The login backdrops are the same mark on a 1920x1080 ground.
+                  for f in g8_login_dark g8_login_light; do
+                      if ! grep -q 'preserveAspectRatio="xMidYMid slice"' "${img}/${f}.svg"; then
+                          echo "::error::${f}.svg is upstream's backdrop, not ours"
+                          exit 1
+                      fi
+                  done
                   bundled="${work}/usr/share/grafana/data/plugins-bundled"
                   count="$(ls "${bundled}" 2>/dev/null | wc -l | tr -d ' ')"
                   echo "bundled plugins: ${count}"

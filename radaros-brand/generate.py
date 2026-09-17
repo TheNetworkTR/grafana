@@ -116,6 +116,23 @@ def main(kit_dir: Path, mark_src: Path):
         "grafana_mask_icon_white.svg": mark(full_paths, full, PAPER),
         "g8_login_dark.svg": backdrop(full_paths, full, DARK_BG, PAPER),
         "g8_login_light.svg": backdrop(full_paths, full, PAPER, INK),
+        # The wordmark slots. Upstream's naming is inconsistent and was read out
+        # of the shipped files rather than assumed: in the UNDERSCORE names
+        # "_dark" is a dark-COLOURED mark (#414142, for the light UI) while in
+        # the HYPHEN names "-dark" is the mark used BY the dark theme (#ccccdc).
+        # Guessing inverts half of them.
+        #
+        # Reached from the solo panel page (/d-solo), which this console can
+        # serve, and from the public-dashboard footer, which it cannot — that
+        # feature is disabled in the deployment. Branded anyway: a file that
+        # ships with the package is a file that can be served.
+        "grafana_text_logo_dark.svg": mark(full_paths, full, INK),
+        "grafana_text_logo_light.svg": mark(full_paths, full, PAPER),
+        "grafana_text_logo-dark.svg": mark(full_paths, full, PAPER),
+        "grafana_text_logo-light.svg": mark(full_paths, full, INK),
+        # Unreferenced by the running bundle today, branded so that a future
+        # upstream version wiring it up cannot reintroduce their logo silently.
+        "grafana_typelogo.svg": mark(full_paths, full, INK, PAPER),
     }
     for name, text in files.items():
         (OUT / name).write_text(text)
