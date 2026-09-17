@@ -56,7 +56,7 @@ const (
 	DefaultHTTPAddr  = "0.0.0.0"
 	Dev              = "development"
 	Prod             = "production"
-	ApplicationName  = "Grafana"
+	ApplicationName  = "RadarOS"
 )
 
 // zoneInfo names environment variable for setting the path to look for the timezone database in go

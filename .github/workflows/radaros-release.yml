@@ -134,6 +134,18 @@ jobs:
                   done
                   [ -f "${img}/mstile-150x150.png" ] || { echo "::error::mstile-150x150.png missing"; exit 1; }
 
+                  # The footer's version line is built in Go from
+                  # setting.ApplicationName, so it never appears in the frontend
+                  # bundle — it reached the browser reading "Grafana v..." while
+                  # every frontend check here was green. Read it out of the
+                  # binary instead.
+                  bin="${work}/usr/share/grafana/bin/grafana"
+                  [ -f "${bin}" ] || bin="$(find "${work}/usr/share/grafana/bin" -maxdepth 1 -type f -name 'grafana*' | head -1)"
+                  if ! grep -qa 'RadarOS' "${bin}"; then
+                      echo "::error::the server binary does not carry RadarOS — ApplicationName did not reach the build"
+                      exit 1
+                  fi
+
                   # The login backdrops are the same mark on a 1920x1080 ground.
                   for f in g8_login_dark g8_login_light; do
                       if ! grep -q 'preserveAspectRatio="xMidYMid slice"' "${img}/${f}.svg"; then
