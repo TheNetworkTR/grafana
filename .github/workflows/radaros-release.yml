@@ -122,6 +122,18 @@ jobs:
                           exit 1
                       fi
                   done
+                  # The Windows tile: index.html points at browserconfig.xml,
+                  # which points at its own image and carries a second copy of
+                  # the colour. Both were upstream's on the first pass — a
+                  # surface reached by pinning the console to a Start menu.
+                  for f in "${img}/browserconfig.xml" "${work}/usr/share/grafana/public/views/index.html"; do
+                      if grep -qF '#2b5797' "${f}"; then
+                          echo "::error::$(basename "${f}") still carries Grafana's tile colour"
+                          exit 1
+                      fi
+                  done
+                  [ -f "${img}/mstile-150x150.png" ] || { echo "::error::mstile-150x150.png missing"; exit 1; }
+
                   # The login backdrops are the same mark on a 1920x1080 ground.
                   for f in g8_login_dark g8_login_light; do
                       if ! grep -q 'preserveAspectRatio="xMidYMid slice"' "${img}/${f}.svg"; then

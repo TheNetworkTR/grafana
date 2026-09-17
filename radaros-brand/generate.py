@@ -139,7 +139,11 @@ def main(kit_dir: Path, mark_src: Path):
 
     icon_svg = OUT / ".app-icon.svg"
     icon_svg.write_text(app_icon(ground, full_paths, full))
-    for name, px in (("fav32.png", 32), ("apple-touch-icon.png", 180)):
+    # mstile is the Windows equivalent of the favicon: index.html points at
+    # browserconfig.xml, which points here. Reached by anyone who pins the
+    # console to a Start menu, and missed on the first pass.
+    for name, px in (("fav32.png", 32), ("apple-touch-icon.png", 180),
+                     ("mstile-150x150.png", 150)):
         subprocess.run(["rsvg-convert", "-w", str(px), "-h", str(px),
                         "-o", str(OUT / name), str(icon_svg)], check=True)
     icon_svg.unlink()
@@ -148,7 +152,7 @@ def main(kit_dir: Path, mark_src: Path):
     Image.open(touch).convert("RGB").save(touch)
 
     print(f"square mark {full_raw} -> {[round(v, 1) for v in full]}")
-    print(f"{len(files) + 2} files written to {OUT}")
+    print(f"{len(files) + 3} files written to {OUT}")
 
 
 if __name__ == "__main__":
